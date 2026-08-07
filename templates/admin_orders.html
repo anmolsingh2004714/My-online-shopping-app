@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+
+{% block title %}Manage Orders{% endblock %}
+
+{% block content %}
+
+<h2 class="text-center mb-4">📦 Manage Orders</h2>
+
+<table class="table table-bordered table-striped">
+
+    <tr>
+        <th>Order ID</th>
+        <th>Customer</th>
+        <th>Product</th>
+        <th>Qty</th>
+        <th>Total</th>
+        <th>Payment</th>
+        <th>Status</th>
+        <th>Date</th>
+        <th>Action</th>
+    </tr>
+
+    {% for order in orders %}
+
+    <tr>
+
+        <td>{{ order[0] }}</td>
+        <td>{{ order[1] }}</td>
+        <td>{{ order[2] }}</td>
+        <td>{{ order[3] }}</td>
+        <td>₹{{ order[4] }}</td>
+        <td>{{ order[5] }}</td>
+        <td>{{ order[6] }}</td>
+        <td>{{ order[7] }}</td>
+
+        <td>
+
+            <a href="{{ url_for('ship_order', order_id=order[0]) }}"
+               class="btn btn-warning btn-sm">
+               🚚 Ship
+            </a>
+
+            <a href="{{ url_for('deliver_order', order_id=order[0]) }}"
+               class="btn btn-success btn-sm mt-1">
+               ✅ Deliver
+            </a>
+
+        </td>
+
+    </tr>
+
+    {% endfor %}
+
+</table>
+
+{% endblock %}

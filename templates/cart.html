@@ -1,0 +1,84 @@
+{% extends "base.html" %}
+
+{% block title %}My Cart{% endblock %}
+
+{% block content %}
+
+<h2 class="text-center mb-4">🛒 My Cart</h2>
+
+{% if items %}
+
+<table class="table table-bordered table-hover">
+
+    <thead class="table-dark">
+
+        <tr>
+    <th>Image</th>
+    <th>Product</th>
+    <th>Price</th>
+    <th>Quantity</th>
+    <th>Action</th>
+</tr>
+
+    </thead>
+
+    <tbody>
+
+        {% for item in items %}
+
+        <tr>
+
+            <td>
+                <img src="{{ url_for('static', filename='uploads/' + item[3]) }}"
+                     width="80"
+                     height="80">
+            </td>
+
+            <td>{{ item[1] }}</td>
+
+            <td>₹{{ item[2] }}</td>
+
+           <td>
+
+    <a href="{{ url_for('decrease', cart_id=item[0]) }}"
+       class="btn btn-warning btn-sm">-</a>
+
+    <strong class="mx-2">{{ item[4] }}</strong>
+
+    <a href="{{ url_for('increase', cart_id=item[0]) }}"
+       class="btn btn-success btn-sm">+</a>
+
+</td>
+            <td>
+    <a href="{{ url_for('remove_cart', cart_id=item[0]) }}"
+       class="btn btn-danger btn-sm">
+        Remove
+    </a>
+</td>
+
+        </tr>
+
+        {% endfor %}
+
+    </tbody>
+
+</table>
+<div class="text-end mt-4">
+
+    <h3>Total : ₹{{ total }}</h3>
+
+   <a href="{{ url_for('place_order') }}" class="btn btn-success">
+    Place Order
+</a>
+
+</div>
+
+{% else %}
+
+<div class="alert alert-warning text-center">
+    Your Cart is Empty.
+</div>
+
+{% endif %}
+
+{% endblock %}

@@ -1,0 +1,91 @@
+{% extends "base.html" %}
+
+{% block title %}Product Details{% endblock %}
+
+{% block content %}
+
+<div class="container mt-5">
+
+    <div class="row">
+
+        <div class="col-md-5">
+
+            <img
+                src="{{ url_for('static', filename='uploads/' + product[5]) }}"
+                class="img-fluid rounded shadow">
+
+        </div>
+
+        <div class="col-md-7">
+
+            <h2>{{ product[1] }}</h2>
+
+            <hr>
+
+            <h3 class="text-success">
+                ₹{{ product[3] }}
+            </h3>
+
+            <p>
+                {{ product[2] }}
+            </p>
+
+            <p>
+                <strong>Stock:</strong>
+                {{ product[4] }}
+            </p>
+
+            <a href="{{ url_for('add_to_cart', product_id=product[0]) }}"
+               class="btn btn-success">
+               🛒 Add to Cart
+            </a>
+
+            <a href="{{ url_for('products') }}"
+               class="btn btn-secondary">
+               ⬅ Back
+            </a>
+
+        </div>
+
+    </div>
+    <hr class="mt-5">
+
+<h3 class="mb-4">⭐ Customer Reviews</h3>
+
+{% if reviews %}
+
+    {% for review in reviews %}
+
+    <div class="card mb-3 shadow-sm">
+
+        <div class="card-body">
+
+            <h5>{{ review[0] }}</h5>
+
+            <p class="text-warning">
+                Rating : {{ review[1] }}/5 ⭐
+            </p>
+
+            <p>{{ review[2] }}</p>
+
+            <small class="text-muted">
+                {{ review[3] }}
+            </small>
+
+        </div>
+
+    </div>
+
+    {% endfor %}
+
+{% else %}
+
+<div class="alert alert-info">
+    No reviews yet.
+</div>
+
+{% endif %}
+
+</div>
+
+{% endblock %}

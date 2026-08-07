@@ -1,0 +1,71 @@
+{% extends "base.html" %}
+
+{% block title %}
+Home
+{% endblock %}
+
+{% block content %}
+
+<!-- Hero Banner -->
+<div class="hero-banner">
+
+    <div class="hero-content">
+
+        <h5>Welcome To MyStore</h5>
+
+        <h1>
+            Best deals | Fast Delivery |Secure Shopping <br>
+        </h1>
+
+        <a href="{{ url_for('products') }}" class="shop-btn">
+            SHOP NOW
+        </a>
+        <div class="image1">
+            <img src=""
+        </div>
+
+    </div>
+
+</div>
+
+<!-- Featured Products -->
+<h2 class="mb-4">Featured Products</h2>
+
+<div class="row">
+
+    <div class="col-md-4 mb-4">
+        <div class="card shadow">
+            <img src="https://imgs.search.brave.com/S_Qp4Or0CrQKaCpy2PqFgDslK055bAYio01Ff0R2zX8/rs:fit:860:0:0:0/g:ce/aHR0cHM6Ly9zdGF0/aWMudmVjdGVlenku/Y29tL3N5c3RlbS9y/ZXNvdXJjZXMvdGh1/bWJuYWlscy8wNzIv/MTE4LzA3Ny9zbWFs/bC9ibGFjay13aXJl/bGVzcy1oZWFkcGhv/bmVzLWZsb2F0aW5n/LWluLWNvbG9yZnVs/LW5lb24tbGlnaHQt/cGhvdG8uanBn" class="card-img-top" alt="Product">
+            <div class="card-body">
+                <h5 class="card-title">Wireless Headphones</h5>
+                <p class="card-text">₹1,999</p>
+                <button class="btn btn-primary w-100">Add to Cart</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-4 mb-4">
+        <div class="card shadow">
+            <img src="https://imgs.search.brave.com/pso45KqUMm7hLfZ4QYfaZDWE-EnCdaQAqC2UqOtR1Vs/rs:fit:860:0:0:0/g:ce/aHR0cHM6Ly81Lmlt/aW1nLmNvbS9kYXRh/NS9TRUxMRVIvRGVm/YXVsdC8yMDIyLzEw/L05CL1ZSL1RRLzEz/NDE5NDc1L3doYXRz/YXBwLWltYWdlLTIw/MjItMTAtMzEtYXQt/MS0xOC0zNS1wbS1q/cGVnLTEwMDB4MTAw/MC5qcGVn" class="card-img-top" alt="Product">
+            <div class="card-body">
+                <h5 class="card-title">Smart Watch</h5>
+                <p class="card-text">₹2,999</p>
+                <button class="btn btn-primary w-100">Add to Cart</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-4 mb-4">
+        <div class="card shadow">
+            <img src="https://imgs.search.brave.com/4FbuNxb-E03eQXAB6VZL2p7qa1Av84wlTazKpUKMSNU/rs:fit:860:0:0:0/g:ce/aHR0cHM6Ly90My5m/dGNkbi5uZXQvanBn/LzExLzQ2LzIzLzAw/LzM2MF9GXzExNDYy/MzAwMDJfUW9TaDdp/VzlhSFBSdklMSkx2/bWNrdjl5T3pQVm50/U2EuanBn" class="card-img-top" alt="Product">
+            <div class="card-body">
+                <h5 class="card-title">Gaming Mouse</h5>
+                <p class="card-text">₹999</p>
+                <button class="btn btn-primary w-100">Add to Cart</button>
+            </div>
+        </div>
+    </div>
+
+</div>
+
+{% endblock %}

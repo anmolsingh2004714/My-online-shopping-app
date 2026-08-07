@@ -1,0 +1,89 @@
+{% extends "base.html" %}
+
+{% block title %}Payment{% endblock %}
+
+{% block content %}
+
+<div class="container mt-5">
+
+    <div class="card shadow p-4">
+
+        <h2 class="text-center mb-4">
+            💳 Razorpay Payment
+        </h2>
+
+        <div class="text-center">
+
+            <button id="pay-btn" class="btn btn-success btn-lg">
+                Pay ₹500
+            </button>
+
+        </div>
+
+    </div>
+
+</div>
+
+<script src="https://checkout.razorpay.com/v1/checkout.js"></script>
+
+<script>
+
+var options = {
+
+    "key": "{{ key_id }}",
+
+    "amount": "{{ order.amount }}",
+
+    "currency": "INR",
+
+    "name": "Anmol Store",
+
+    "description": "Order Payment",
+
+    "order_id": "{{ order.id }}",
+
+   handler: function (response) {
+
+    var form = document.createElement("form");
+
+    form.method = "POST";
+
+    form.action = "/payment-success";
+
+    var payment = document.createElement("input");
+    payment.type = "hidden";
+    payment.name = "razorpay_payment_id";
+    payment.value = response.razorpay_payment_id;
+    form.appendChild(payment);
+
+    var order = document.createElement("input");
+    order.type = "hidden";
+    order.name = "razorpay_order_id";
+    order.value = response.razorpay_order_id;
+    form.appendChild(order);
+
+    document.body.appendChild(form);
+    form.submit();
+},
+
+    "theme": {
+
+        "color": "#3399cc"
+
+    }
+
+};
+
+var rzp = new Razorpay(options);
+
+document.getElementById("pay-btn").onclick = function(e){
+
+    rzp.open();
+
+    e.preventDefault();
+
+}
+
+</script>
+
+{% endblock %}

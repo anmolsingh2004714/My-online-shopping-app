@@ -1,0 +1,72 @@
+{% extends "base.html" %}
+
+{% block title %}My Orders{% endblock %}
+
+{% block content %}
+
+<h2 class="text-center mb-4">My Orders</h2>
+
+<table class="table table-bordered table-striped">
+
+    <thead>
+
+        <tr>
+
+            <th>Product</th>
+            <th>Quantity</th>
+            <th>Total</th>
+            <th>Date</th>
+            <th>Status</th>
+            <th>Invoice</th>
+            <th>Review</th>
+
+        </tr>
+
+    </thead>
+
+    <tbody>
+
+        {% for order in orders %}
+
+        <tr>
+
+            <td>{{ order[1] }}</td>
+
+            <td>{{ order[2] }}</td>
+
+            <td>₹{{ order[3] }}</td>
+
+            <td>{{ order[4] }}</td>
+
+            <td>
+                <span class="badge bg-primary">
+    {{ order[6] }}
+</span>
+            </td>
+
+            <td>
+
+                <a href="{{ url_for('invoice', order_id=order[0]) }}"
+                   class="btn btn-primary btn-sm">
+
+                    Download PDF
+
+                </a>
+
+            </td>
+            <td>
+    <a href="{{ url_for('review', product_id=order[0]) }}"
+       class="btn btn-warning btn-sm">
+        ⭐ Review
+    </a>
+</td>   
+
+        </tr>
+
+        {% endfor %}
+
+    </tbody>
+
+</table>
+
+{% endblock %}

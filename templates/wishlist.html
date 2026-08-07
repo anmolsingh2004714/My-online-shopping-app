@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+
+{% block title %}Wishlist{% endblock %}
+
+{% block content %}
+
+<h2 class="text-center mb-4">❤️ My Wishlist</h2>
+
+<div class="row">
+
+{% for item in items %}
+
+<div class="col-md-4">
+
+    <div class="card shadow mb-4">
+
+        <img src="{{ url_for('static', filename='uploads/' + item[4]) }}"
+             class="card-img-top"
+             height="250">
+
+        <div class="card-body">
+
+            <h4>{{ item[2] }}</h4>
+
+            <h5 class="text-success">
+                ₹{{ item[3] }}
+            </h5>
+
+            <a href="{{ url_for('add_to_cart', product_id=item[1]) }}"
+               class="btn btn-success w-100">
+                🛒 Add to Cart
+            </a>
+            <a href="{{ url_for('remove_wishlist', id=item[0]) }}"
+   class="btn btn-danger w-100 mt-2">
+    ❌ Remove
+</a>
+
+        </div>
+
+    </div>
+
+</div>
+
+{% endfor %}
+
+</div>
+
+{% endblock %}

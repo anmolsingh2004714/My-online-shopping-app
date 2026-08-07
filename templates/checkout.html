@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+
+{% block title %}Checkout{% endblock %}
+
+{% block content %}
+
+<div class="row justify-content-center">
+
+    <div class="col-md-6">
+
+        <div class="card shadow p-4">
+
+            <h2 class="text-center mb-4">Checkout</h2>
+
+            <h4 class="text-success text-center">
+                🎉 Your Order Has Been Placed Successfully!
+            </h4>
+
+            <hr>
+
+            <div class="text-center">
+
+                <a href="{{ url_for('products') }}" class="btn btn-success">
+                    Continue Shopping
+                </a>
+
+            </div>
+
+        </div>
+
+    </div>
+
+</div>
+
+{% endblock %}

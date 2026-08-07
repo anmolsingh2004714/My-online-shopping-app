@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+
+{% block title %}Payment Success{% endblock %}
+
+{% block content %}
+
+<div class="text-center mt-5">
+
+    <h1 class="text-success">
+        ✅ Payment Successful
+    </h1>
+
+    <h4 class="mt-3">
+        Payment ID:
+    </h4>
+
+    <p>{{ payment_id }}</p>
+
+    <a href="{{ url_for('orders') }}"
+       class="btn btn-primary mt-3">
+        View Orders
+    </a>
+
+</div>
+
+{% endblock %}
