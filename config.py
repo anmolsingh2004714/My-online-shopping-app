@@ -1,17 +1,18 @@
+import os
 import mysql.connector
 
 db = mysql.connector.connect(
-    host="localhost",
-    user="root",
-    password="annu2004",
-    database="ecommerce_db"
+    host=os.getenv("DB_HOST", "localhost"),
+    user=os.getenv("DB_USER", "root"),
+    password=os.getenv("DB_PASSWORD", ""),
+    database=os.getenv("DB_NAME", "ecommerce_db"),
+    port=int(os.getenv("DB_PORT", "3306"))
 )
 
 cursor = db.cursor(buffered=True)
 
+RAZORPAY_KEY_ID = os.getenv("rzp_test_TLJTjoSTwdiNSO")
+RAZORPAY_KEY_SECRET = os.getenv("UAUODs7BOqMVjUE4Q6kgTyKB")
 
-RAZORPAY_KEY_ID = "rzp_test_TLJTjoSTwdiNSO"
-RAZORPAY_KEY_SECRET = "UAUODs7BOqMVjUE4Q6kgTyKB"
-
-EMAIL = "anmol649kumar@gmail.com"
-EMAIL_PASSWORD = "anmol.2004"
+EMAIL = os.getenv("anmol640singh")
+EMAIL_PASSWORD = os.getenv("anmol.2004")
