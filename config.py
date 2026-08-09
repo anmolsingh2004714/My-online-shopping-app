@@ -11,8 +11,17 @@ db = mysql.connector.connect(
 
 cursor = db.cursor(buffered=True)
 
-RAZORPAY_KEY_ID = os.getenv("rzp_test_TLJTjoSTwdiNSO")
-RAZORPAY_KEY_SECRET = os.getenv("UAUODs7BOqMVjUE4Q6kgTyKB")
+SECRET_KEY = os.getenv("FLASK_SECRET_KEY")
 
-EMAIL = os.getenv("anmol640singh")
-EMAIL_PASSWORD = os.getenv("anmol.2004")
+RAZORPAY_KEY_ID = os.getenv("RAZORPAY_KEY_ID")
+RAZORPAY_KEY_SECRET = os.getenv("RAZORPAY_KEY_SECRET")
+
+EMAIL = os.getenv("EMAIL")
+EMAIL_PASSWORD = os.getenv("EMAIL_PASSWORD")
+
+# Comma separated list of e-mail addresses allowed to use the admin routes.
+ADMIN_EMAILS = {
+    email.strip().lower()
+    for email in os.getenv("ADMIN_EMAILS", "").split(",")
+    if email.strip()
+}

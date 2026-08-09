@@ -2,3 +2,4 @@ venv/
 .env
 __pycache__/
 transfer_db.py
+invoice_*.pdf
