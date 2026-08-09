@@ -15,7 +15,7 @@
         <div class="text-center">
 
             <button id="pay-btn" class="btn btn-success btn-lg">
-                Pay ₹500
+                Pay ₹{{ "%.2f"|format(order.amount / 100) }}
             </button>
 
         </div>
@@ -61,6 +61,12 @@ var options = {
     order.name = "razorpay_order_id";
     order.value = response.razorpay_order_id;
     form.appendChild(order);
+
+    var signature = document.createElement("input");
+    signature.type = "hidden";
+    signature.name = "razorpay_signature";
+    signature.value = response.razorpay_signature;
+    form.appendChild(signature);
 
     document.body.appendChild(form);
     form.submit();

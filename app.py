@@ -1,34 +1,86 @@
-import random
+import io
+import os
+import secrets
 import smtplib
+import time
 from email.mime.text import MIMEText
-from config import EMAIL, EMAIL_PASSWORD
-from flask import send_file
+from functools import wraps
+
+import razorpay
+from flask import Flask, abort, render_template, request, redirect, send_file, url_for, session
 from reportlab.pdfgen import canvas
-from reportlab.platypus import SimpleDocTemplate, Table, TableStyle
-from reportlab.lib import colors
-from reportlab.lib.styles import getSampleStyleSheet
-from reportlab.platypus import Paragraph
-from flask import Flask, render_template, request, redirect, send_file, send_file, url_for, session
 from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.utils import secure_filename
-import os
-import razorpay
 
 from config import (
+    ADMIN_EMAILS,
+    EMAIL,
+    EMAIL_PASSWORD,
+    SECRET_KEY,
     db,
     cursor,
     RAZORPAY_KEY_ID,
     RAZORPAY_KEY_SECRET
 )
+
 app = Flask(__name__)
-app.secret_key = "mysecretkey123"
+
+if not SECRET_KEY:
+    raise RuntimeError("FLASK_SECRET_KEY environment variable is required")
+
+app.secret_key = SECRET_KEY
+app.config.update(
+    SESSION_COOKIE_HTTPONLY=True,
+    SESSION_COOKIE_SAMESITE="Lax",
+    SESSION_COOKIE_SECURE=os.getenv("SESSION_COOKIE_SECURE", "1") == "1",
+    MAX_CONTENT_LENGTH=5 * 1024 * 1024,
+)
+
 client = razorpay.Client(
     auth=(RAZORPAY_KEY_ID, RAZORPAY_KEY_SECRET)
 )
 
 app.config["UPLOAD_FOLDER"] = "static/uploads"
 
-print("✅ Database Connected Successfully")
+ALLOWED_IMAGE_EXTENSIONS = {"png", "jpg", "jpeg", "gif", "webp"}
+
+OTP_TTL_SECONDS = 10 * 60
+
+
+def allowed_image(filename):
+    return (
+        "." in filename
+        and filename.rsplit(".", 1)[1].lower() in ALLOWED_IMAGE_EXTENSIONS
+    )
+
+
+def login_required(view):
+    @wraps(view)
+    def wrapped(*args, **kwargs):
+        if "user" not in session:
+            return redirect(url_for("login"))
+        return view(*args, **kwargs)
+
+    return wrapped
+
+
+def admin_required(view):
+    @wraps(view)
+    def wrapped(*args, **kwargs):
+        user = session.get("user")
+        if not user:
+            return redirect(url_for("login"))
+        if user.lower() not in ADMIN_EMAILS:
+            abort(403)
+        return view(*args, **kwargs)
+
+    return wrapped
+
+
+@app.context_processor
+def inject_is_admin():
+    user = session.get("user")
+    return {"is_admin": bool(user) and user.lower() in ADMIN_EMAILS}
 
 
 # ---------------- Home ----------------
@@ -51,6 +103,19 @@ def register():
         email = request.form["email"]
         phone = request.form["phone"]
         password = request.form["password"]
+
+        if len(password) < 8:
+            return render_template(
+                "register.html",
+                error="Password must be at least 8 characters long"
+            )
+
+        cursor.execute("SELECT id FROM users WHERE email=%s", (email,))
+        if cursor.fetchone():
+            return render_template(
+                "register.html",
+                error="An account with that e-mail already exists"
+            )
 
         hashed_password = generate_password_hash(password)
 
@@ -83,17 +148,15 @@ def login():
 
         user = cursor.fetchone()
 
-        if user:
+        if user and check_password_hash(user[3], password):
+            session.clear()
+            session["user"] = user[2]
+            return redirect(url_for("home"))
 
-            if check_password_hash(user[3], password):
-                session["user"] = user[2]
-                return redirect(url_for("home"))
-
-            else:
-                return "Wrong Password"
-
-        else:
-            return "Email Not Found"
+        return render_template(
+            "login.html",
+            error="Invalid e-mail or password"
+        )
 
     return render_template("login.html")
 
@@ -109,6 +172,7 @@ def logout():
 
 # ---------------- Add Product ----------------
 @app.route("/add-product", methods=["GET", "POST"])
+@admin_required
 def add_product():
 
     if request.method == "POST":
@@ -124,6 +188,11 @@ def add_product():
         filename = ""
 
         if image and image.filename != "":
+            if not allowed_image(image.filename):
+                return render_template(
+                    "add_product.html",
+                    error="Only PNG, JPG, GIF and WEBP images are allowed"
+                )
             filename = secure_filename(image.filename)
             image.save(os.path.join(app.config["UPLOAD_FOLDER"], filename))
 
@@ -182,10 +251,11 @@ def forgot_password():
 
         if user:
 
-            otp = random.randint(100000, 999999)
+            otp = secrets.randbelow(900000) + 100000
 
             session["reset_email"] = email
             session["otp"] = str(otp)
+            session["otp_expires_at"] = time.time() + OTP_TTL_SECONDS
 
             msg = MIMEText(f"Your OTP is: {otp}")
             msg["Subject"] = "Password Reset OTP"
@@ -198,9 +268,7 @@ def forgot_password():
             server.send_message(msg)
             server.quit()
 
-            return redirect(url_for("reset_password"))
-
-        return "Email not found"
+        return redirect(url_for("reset_password"))
 
     return render_template("forgot_password.html")
 
@@ -213,26 +281,45 @@ def reset_password():
         otp = request.form["otp"]
         new_password = request.form["password"]
 
-        if otp == session.get("otp"):
+        expected_otp = session.get("otp")
+        reset_email = session.get("reset_email")
+        expires_at = session.get("otp_expires_at", 0)
 
-            hashed = generate_password_hash(new_password)
-
-            cursor.execute(
-                "UPDATE users SET password=%s WHERE email=%s",
-                (
-                    hashed,
-                    session["reset_email"]
-                )
-            )
-
-            db.commit()
-
+        if not expected_otp or not reset_email or time.time() > expires_at:
             session.pop("otp", None)
             session.pop("reset_email", None)
+            session.pop("otp_expires_at", None)
+            return render_template(
+                "reset_password.html",
+                error="Your OTP has expired, please request a new one"
+            )
 
-            return redirect(url_for("login"))
+        if not secrets.compare_digest(otp, expected_otp):
+            return render_template(
+                "reset_password.html",
+                error="Invalid OTP"
+            )
 
-        return "Invalid OTP"
+        if len(new_password) < 8:
+            return render_template(
+                "reset_password.html",
+                error="Password must be at least 8 characters long"
+            )
+
+        hashed = generate_password_hash(new_password)
+
+        cursor.execute(
+            "UPDATE users SET password=%s WHERE email=%s",
+            (hashed, reset_email)
+        )
+
+        db.commit()
+
+        session.pop("otp", None)
+        session.pop("reset_email", None)
+        session.pop("otp_expires_at", None)
+
+        return redirect(url_for("login"))
 
     return render_template("reset_password.html")
 @app.route("/product/<int:id>")
@@ -268,10 +355,8 @@ def product_details(id):
     )
 # ---------------- Add To Cart ----------------
 @app.route("/add-to-cart/<int:product_id>")
+@login_required
 def add_to_cart(product_id):
-
-    if "user" not in session:
-        return redirect(url_for("login"))
 
     user_email = session["user"]
 
@@ -289,10 +374,8 @@ def add_to_cart(product_id):
 # ---------------- Cart ----------------
 # ---------------- Cart ----------------
 @app.route("/cart")
+@login_required
 def cart():
-
-    if "user" not in session:
-        return redirect(url_for("login"))
 
     sql = """
     SELECT
@@ -319,52 +402,77 @@ def cart():
 
 # ---------------- Remove From Cart ----------------
 @app.route("/remove-cart/<int:cart_id>")
+@login_required
 def remove_cart(cart_id):
 
-    sql = "DELETE FROM cart WHERE id=%s"
+    sql = "DELETE FROM cart WHERE id=%s AND user_email=%s"
 
-    cursor.execute(sql, (cart_id,))
+    cursor.execute(sql, (cart_id, session["user"]))
     db.commit()
 
     return redirect(url_for("cart"))
 # ---------------- Increase Quantity ----------------
 @app.route("/increase/<int:cart_id>")
+@login_required
 def increase(cart_id):
 
-    sql = "UPDATE cart SET quantity = quantity + 1 WHERE id=%s"
+    sql = "UPDATE cart SET quantity = quantity + 1 WHERE id=%s AND user_email=%s"
 
-    cursor.execute(sql, (cart_id,))
+    cursor.execute(sql, (cart_id, session["user"]))
     db.commit()
 
     return redirect(url_for("cart"))
 # ---------------- Decrease Quantity ----------------
 @app.route("/decrease/<int:cart_id>")
+@login_required
 def decrease(cart_id):
 
     sql = """
     UPDATE cart
     SET quantity = quantity - 1
-    WHERE id=%s AND quantity > 1
+    WHERE id=%s AND user_email=%s AND quantity > 1
     """
 
-    cursor.execute(sql, (cart_id,))
+    cursor.execute(sql, (cart_id, session["user"]))
     db.commit()
 
     return redirect(url_for("cart"))
 
+def cart_total_paise(user_email):
+    cursor.execute("""
+        SELECT SUM(products.price * cart.quantity)
+        FROM cart
+        JOIN products
+        ON cart.product_id = products.id
+        WHERE cart.user_email=%s
+    """, (user_email,))
+
+    total = cursor.fetchone()[0]
+
+    if not total:
+        return 0
+
+    return int(round(float(total) * 100))
+
+
 @app.route("/payment")
+@login_required
 def payment():
 
-    if "user" not in session:
-        return redirect(url_for("login"))
+    # Razorpay expects the amount in paise, and it must be derived from the
+    # cart on the server so the client cannot choose what it pays.
+    amount = cart_total_paise(session["user"])
 
-    amount = 500 * 100   # ₹500 (Razorpay paise me amount leta hai)
+    if amount <= 0:
+        return redirect(url_for("cart"))
 
     order = client.order.create({
         "amount": amount,
         "currency": "INR",
         "payment_capture": 1
     })
+
+    session["razorpay_order_id"] = order["id"]
 
     return render_template(
         "payment.html",
@@ -373,12 +481,31 @@ def payment():
     )
 # ---------------- Payment Success ----------------
 @app.route("/payment-success", methods=["POST"])
+@login_required
 def payment_success():
 
-    if "user" not in session:
-        return redirect(url_for("login"))
-
     payment_id = request.form.get("razorpay_payment_id")
+    order_id = request.form.get("razorpay_order_id")
+    signature = request.form.get("razorpay_signature")
+
+    expected_order_id = session.get("razorpay_order_id")
+
+    if not payment_id or not order_id or not signature:
+        abort(400)
+
+    if not expected_order_id or order_id != expected_order_id:
+        abort(400)
+
+    try:
+        client.utility.verify_payment_signature({
+            "razorpay_order_id": order_id,
+            "razorpay_payment_id": payment_id,
+            "razorpay_signature": signature
+        })
+    except razorpay.errors.SignatureVerificationError:
+        abort(400)
+
+    session.pop("razorpay_order_id", None)
 
     cursor.execute("""
         SELECT product_id, quantity
@@ -426,18 +553,14 @@ def payment_success():
     )
     # ---------------- Checkout ----------------
 @app.route("/checkout")
+@login_required
 def checkout():
-
-    if "user" not in session:
-        return redirect(url_for("login"))
 
     return render_template("checkout.html")
 # ---------------- Place Order ----------------
 @app.route("/place-order")
+@login_required
 def place_order():
-
-    if "user" not in session:
-        return redirect(url_for("login"))
 
     user_email = session["user"]
 
@@ -479,10 +602,8 @@ def place_order():
     return redirect(url_for("orders"))
 # ---------------- Orders ----------------
 @app.route("/orders")
+@login_required
 def orders():
-
-    if "user" not in session:
-        return redirect(url_for("login"))
 
     sql = """
 SELECT
@@ -501,8 +622,6 @@ ORDER BY orders.id DESC
 
     cursor.execute(sql, (session["user"],))
 
-    cursor.execute(sql, (session["user"],))
-
     orders_data = cursor.fetchall()
 
     return render_template(
@@ -510,14 +629,19 @@ ORDER BY orders.id DESC
         orders=orders_data
     )
 @app.route("/review/<int:product_id>", methods=["GET", "POST"])
+@login_required
 def review(product_id):
-
-    if "user" not in session:
-        return redirect(url_for("login"))
 
     if request.method == "POST":
 
-        rating = request.form["rating"]
+        try:
+            rating = int(request.form["rating"])
+        except (KeyError, ValueError):
+            abort(400)
+
+        if not 1 <= rating <= 5:
+            abort(400)
+
         review = request.form["review"]
 
         cursor.execute("""
@@ -540,6 +664,7 @@ def review(product_id):
     )
 # ---------------- Admin Dashboard ----------------
 @app.route("/admin")
+@admin_required
 def admin():
 
     cursor.execute("SELECT COUNT(*) FROM users")
@@ -565,6 +690,7 @@ def admin():
         revenue=revenue
     )
 @app.route("/admin/orders")
+@admin_required
 def admin_orders():
 
     cursor.execute("""
@@ -592,6 +718,7 @@ def admin_orders():
         orders=orders
     )
 @app.route("/ship-order/<int:order_id>")
+@admin_required
 def ship_order(order_id):
 
     cursor.execute(
@@ -605,6 +732,7 @@ def ship_order(order_id):
 
 
 @app.route("/deliver-order/<int:order_id>")
+@admin_required
 def deliver_order(order_id):
 
     cursor.execute(
@@ -617,6 +745,7 @@ def deliver_order(order_id):
     return redirect(url_for("admin_orders"))
 # ---------------- Edit Product ----------------
 @app.route("/edit-product/<int:id>", methods=["GET", "POST"])
+@admin_required
 def edit_product(id):
 
     if request.method == "POST":
@@ -646,6 +775,7 @@ def edit_product(id):
     return render_template("edit_product.html", product=product)
 # ---------------- Delete Product ----------------
 @app.route("/delete-product/<int:id>")
+@admin_required
 def delete_product(id):
 
     cursor.execute("DELETE FROM products WHERE id=%s", (id,))
@@ -654,10 +784,8 @@ def delete_product(id):
     return redirect(url_for("products"))
 # ---------------- Wishlist ----------------
 @app.route("/wishlist")
+@login_required
 def wishlist():
-
-    if "user" not in session:
-        return redirect(url_for("login"))
 
     sql = """
     SELECT
@@ -678,18 +806,20 @@ def wishlist():
     return render_template("wishlist.html", items=items)
 # ---------------- Remove Wishlist ----------------
 @app.route("/remove-wishlist/<int:id>")
+@login_required
 def remove_wishlist(id):
 
-    cursor.execute("DELETE FROM wishlist WHERE id=%s", (id,))
+    cursor.execute(
+        "DELETE FROM wishlist WHERE id=%s AND user_email=%s",
+        (id, session["user"])
+    )
     db.commit()
 
     return redirect(url_for("wishlist"))
 # ---------------- Profile ----------------
 @app.route("/profile")
+@login_required
 def profile():
-
-    if "user" not in session:
-        return redirect(url_for("login"))
 
     cursor.execute(
         "SELECT full_name,email,phone FROM users WHERE email=%s",
@@ -701,10 +831,8 @@ def profile():
     return render_template("profile.html", user=user)
 # ---------------- Edit Profile ----------------
 @app.route("/edit-profile", methods=["GET", "POST"])
+@login_required
 def edit_profile():
-
-    if "user" not in session:
-        return redirect(url_for("login"))
 
     if request.method == "POST":
 
@@ -732,19 +860,10 @@ def edit_profile():
 
     return render_template("edit_profile.html", user=user)
 
-    from flask import send_file
-from reportlab.pdfgen import canvas
-
 
 @app.route("/invoice/<int:order_id>")
+@login_required
 def invoice(order_id):
-
-    filename = f"invoice_{order_id}.pdf"
-
-    c = canvas.Canvas(filename)
-
-    c.setFont("Helvetica-Bold", 18)
-    c.drawString(180, 800, "E-Commerce Invoice")
 
     cursor.execute("""
         SELECT
@@ -755,10 +874,19 @@ def invoice(order_id):
         FROM orders
         JOIN products
         ON orders.product_id = products.id
-        WHERE orders.id=%s
-    """, (order_id,))
+        WHERE orders.id=%s AND orders.user_email=%s
+    """, (order_id, session["user"]))
 
     order = cursor.fetchone()
+
+    if not order:
+        abort(404)
+
+    buffer = io.BytesIO()
+    c = canvas.Canvas(buffer)
+
+    c.setFont("Helvetica-Bold", 18)
+    c.drawString(180, 800, "E-Commerce Invoice")
 
     c.setFont("Helvetica", 14)
 
@@ -768,10 +896,16 @@ def invoice(order_id):
     c.drawString(50, 640, f"Date : {order[3]}")
 
     c.save()
+    buffer.seek(0)
 
-    return send_file(filename, as_attachment=True)
+    return send_file(
+        buffer,
+        as_attachment=True,
+        download_name=f"invoice_{order_id}.pdf",
+        mimetype="application/pdf"
+    )
 
 
 # ---------------- Run ----------------
 if __name__ == "__main__":
-    app.run(debug=True)
+    app.run(debug=os.getenv("FLASK_DEBUG", "0") == "1")

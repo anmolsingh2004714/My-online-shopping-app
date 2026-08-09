@@ -6,6 +6,11 @@ content %}
     <div class="card shadow p-4">
       <h2 class="text-center mb-4">Add Product</h2>
 
+      {% if error %}
+<div class="alert alert-danger">{{ error }}</div>
+{% endif %}
+
+
       <form method="POST" enctype="multipart/form-data">
         <div class="mb-3">
           <label>Product Name</label>
