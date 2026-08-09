@@ -4,3 +4,4 @@ instance/
 .env
 __pycache__/
 transfer_db.py
+.coverage
