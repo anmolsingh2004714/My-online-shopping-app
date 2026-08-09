@@ -46,7 +46,7 @@ shopkart/
 ├── app.py            # app factory, routes, cart maths
 ├── db.py             # schema, connection helpers, demo seed data
 ├── templates/        # Jinja templates (Tailwind utility classes)
-├── static/           # small custom CSS and product placeholder SVGs
+├── static/           # small custom CSS and product photos (see static/img/CREDITS.md)
 └── tests/            # pytest suite covering auth, catalogue, cart, checkout
 ```
 

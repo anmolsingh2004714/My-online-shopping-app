@@ -9,7 +9,7 @@
     <ul class="space-y-4">
       {% for item in items %}
         <li class="flex flex-col gap-4 rounded-2xl border border-slate-200 bg-white p-4 sm:flex-row sm:items-center">
-          <img src="{{ url_for('static', filename='img/' ~ item['image'] ~ '.svg') }}" alt="{{ item['name'] }}"
+          <img src="{{ url_for('static', filename='img/' ~ item['image']) }}" alt="{{ item['name'] }}"
                class="h-24 w-full rounded-xl object-cover sm:h-20 sm:w-24">
 
           <div class="flex-1">

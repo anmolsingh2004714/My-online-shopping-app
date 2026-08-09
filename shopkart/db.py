@@ -59,7 +59,7 @@ DEMO_PRODUCTS = [
         4999.0,
         18,
         "Audio",
-        "headphones",
+        "headphones.webp",
         4.7,
     ),
     (
@@ -68,7 +68,7 @@ DEMO_PRODUCTS = [
         1499.0,
         42,
         "Accessories",
-        "mouse",
+        "mouse.webp",
         4.5,
     ),
     (
@@ -77,7 +77,7 @@ DEMO_PRODUCTS = [
         3299.0,
         25,
         "Wearables",
-        "watch",
+        "watch.webp",
         4.4,
     ),
     (
@@ -86,7 +86,7 @@ DEMO_PRODUCTS = [
         5499.0,
         11,
         "Accessories",
-        "keyboard",
+        "keyboard.webp",
         4.8,
     ),
     (
@@ -95,7 +95,7 @@ DEMO_PRODUCTS = [
         2199.0,
         60,
         "Power",
-        "powerbank",
+        "powerbank.webp",
         4.3,
     ),
     (
@@ -104,7 +104,7 @@ DEMO_PRODUCTS = [
         1899.0,
         30,
         "Studio",
-        "ringlight",
+        "ringlight.webp",
         4.2,
     ),
     (
@@ -113,7 +113,7 @@ DEMO_PRODUCTS = [
         2799.0,
         22,
         "Audio",
-        "speaker",
+        "speaker.webp",
         4.6,
     ),
     (
@@ -122,7 +122,7 @@ DEMO_PRODUCTS = [
         2499.0,
         35,
         "Bags",
-        "backpack",
+        "backpack.webp",
         4.5,
     ),
 ]
