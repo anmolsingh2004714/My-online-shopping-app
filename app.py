@@ -1,34 +1,112 @@
+import logging
+import os
 import random
 import smtplib
+from contextlib import contextmanager
 from email.mime.text import MIMEText
-from config import EMAIL, EMAIL_PASSWORD
-from flask import send_file
-from reportlab.pdfgen import canvas
-from reportlab.platypus import SimpleDocTemplate, Table, TableStyle
-from reportlab.lib import colors
-from reportlab.lib.styles import getSampleStyleSheet
-from reportlab.platypus import Paragraph
-from flask import Flask, render_template, request, redirect, send_file, send_file, url_for, session
-from werkzeug.security import generate_password_hash, check_password_hash
-from werkzeug.utils import secure_filename
-import os
+
+import mysql.connector
 import razorpay
+from flask import (
+    Flask,
+    abort,
+    flash,
+    redirect,
+    render_template,
+    request,
+    send_file,
+    session,
+    url_for,
+)
+from reportlab.pdfgen import canvas
+from werkzeug.exceptions import HTTPException
+from werkzeug.security import check_password_hash, generate_password_hash
+from werkzeug.utils import secure_filename
 
 from config import (
-    db,
-    cursor,
+    EMAIL,
+    EMAIL_PASSWORD,
     RAZORPAY_KEY_ID,
-    RAZORPAY_KEY_SECRET
+    RAZORPAY_KEY_SECRET,
+    cursor,
+    db,
 )
+
+logging.basicConfig(
+    level=os.getenv("LOG_LEVEL", "INFO"),
+    format="%(asctime)s %(levelname)s %(name)s: %(message)s"
+)
+logger = logging.getLogger(__name__)
+
 app = Flask(__name__)
-app.secret_key = "mysecretkey123"
-client = razorpay.Client(
-    auth=(RAZORPAY_KEY_ID, RAZORPAY_KEY_SECRET)
-)
+app.secret_key = os.getenv("SECRET_KEY", "mysecretkey123")
+
+if RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET:
+    client = razorpay.Client(
+        auth=(RAZORPAY_KEY_ID, RAZORPAY_KEY_SECRET)
+    )
+else:
+    client = None
 
 app.config["UPLOAD_FOLDER"] = "static/uploads"
+os.makedirs(app.config["UPLOAD_FOLDER"], exist_ok=True)
 
-print("✅ Database Connected Successfully")
+
+# ---------------- Error Handling Helpers ----------------
+@contextmanager
+def db_transaction():
+    """Commit on success, roll back and re-raise on any failure."""
+    try:
+        yield cursor
+        db.commit()
+    except Exception:
+        try:
+            db.rollback()
+        except mysql.connector.Error:
+            logger.exception("Rollback failed")
+        raise
+
+
+def required_fields(*names):
+    """Return stripped form values, aborting with 400 if any is missing."""
+    values = []
+
+    for name in names:
+        value = (request.form.get(name) or "").strip()
+
+        if not value:
+            abort(400, description=f"Missing required field: {name}")
+
+        values.append(value)
+
+    return values
+
+
+def parse_number(value, name, cast):
+    try:
+        return cast(value)
+    except (TypeError, ValueError):
+        abort(400, description=f"{name} must be a number")
+
+
+@app.errorhandler(HTTPException)
+def handle_http_error(error):
+    return render_template(
+        "error.html",
+        code=error.code,
+        message=error.description
+    ), error.code
+
+
+@app.errorhandler(Exception)
+def handle_unexpected_error(error):
+    logger.exception("Unhandled error on %s", request.path, exc_info=error)
+
+    return render_template(
+        "error.html",
+        code=500,
+        message="Something went wrong. Please try again later."
+    ), 500
 
 
 # ---------------- Home ----------------
@@ -47,10 +125,9 @@ def register():
 
     if request.method == "POST":
 
-        full_name = request.form["full_name"]
-        email = request.form["email"]
-        phone = request.form["phone"]
-        password = request.form["password"]
+        full_name, email, phone, password = required_fields(
+            "full_name", "email", "phone", "password"
+        )
 
         hashed_password = generate_password_hash(password)
 
@@ -61,8 +138,14 @@ def register():
 
         values = (full_name, email, phone, hashed_password)
 
-        cursor.execute(sql, values)
-        db.commit()
+        try:
+            with db_transaction() as cur:
+                cur.execute(sql, values)
+        except mysql.connector.IntegrityError:
+            logger.warning("Registration rejected for existing email %s", email)
+            flash("An account with that email already exists.", "danger")
+
+            return render_template("register.html"), 409
 
         return redirect(url_for("login"))
 
@@ -75,25 +158,21 @@ def login():
 
     if request.method == "POST":
 
-        email = request.form["email"]
-        password = request.form["password"]
+        email, password = required_fields("email", "password")
 
         sql = "SELECT * FROM users WHERE email=%s"
         cursor.execute(sql, (email,))
 
         user = cursor.fetchone()
 
-        if user:
+        if user and check_password_hash(user[3], password):
+            session["user"] = user[2]
 
-            if check_password_hash(user[3], password):
-                session["user"] = user[2]
-                return redirect(url_for("home"))
+            return redirect(url_for("home"))
 
-            else:
-                return "Wrong Password"
+        flash("Invalid email or password.", "danger")
 
-        else:
-            return "Email Not Found"
+        return render_template("login.html"), 401
 
     return render_template("login.html")
 
@@ -113,19 +192,30 @@ def add_product():
 
     if request.method == "POST":
 
-        name = request.form["name"]
-        description = request.form["description"]
-        price = request.form["price"]
-        stock = request.form["stock"]
-        category = request.form["category"]
+        name, description, price, stock, category = required_fields(
+            "name", "description", "price", "stock", "category"
+        )
 
-        image = request.files["image"]
+        price = parse_number(price, "price", float)
+        stock = parse_number(stock, "stock", int)
+
+        image = request.files.get("image")
 
         filename = ""
 
-        if image and image.filename != "":
+        if image and image.filename:
             filename = secure_filename(image.filename)
-            image.save(os.path.join(app.config["UPLOAD_FOLDER"], filename))
+
+            if not filename:
+                abort(400, description="Invalid image file name")
+
+            try:
+                image.save(
+                    os.path.join(app.config["UPLOAD_FOLDER"], filename)
+                )
+            except OSError:
+                logger.exception("Failed to save uploaded image %s", filename)
+                abort(500, description="Could not save the uploaded image")
 
         sql = """
         INSERT INTO products(name, description, price, stock, image, category)
@@ -134,8 +224,8 @@ def add_product():
 
         values = (name, description, price, stock, filename, category)
 
-        cursor.execute(sql, values)
-        db.commit()
+        with db_transaction() as cur:
+            cur.execute(sql, values)
 
         return redirect(url_for("products"))
 
@@ -171,7 +261,7 @@ def forgot_password():
 
     if request.method == "POST":
 
-        email = request.form["email"]
+        (email,) = required_fields("email")
 
         cursor.execute(
             "SELECT * FROM users WHERE email=%s",
@@ -180,27 +270,35 @@ def forgot_password():
 
         user = cursor.fetchone()
 
-        if user:
+        if not user:
+            flash("No account found for that email.", "danger")
 
-            otp = random.randint(100000, 999999)
+            return render_template("forgot_password.html"), 404
 
-            session["reset_email"] = email
-            session["otp"] = str(otp)
+        if not (EMAIL and EMAIL_PASSWORD):
+            logger.error("Password reset requested but email is not configured")
+            abort(503, description="Password reset email is not configured")
 
-            msg = MIMEText(f"Your OTP is: {otp}")
-            msg["Subject"] = "Password Reset OTP"
-            msg["From"] = EMAIL
-            msg["To"] = email
+        otp = random.randint(100000, 999999)
 
-            server = smtplib.SMTP("smtp.gmail.com", 587)
-            server.starttls()
-            server.login(EMAIL, EMAIL_PASSWORD)
-            server.send_message(msg)
-            server.quit()
+        msg = MIMEText(f"Your OTP is: {otp}")
+        msg["Subject"] = "Password Reset OTP"
+        msg["From"] = EMAIL
+        msg["To"] = email
 
-            return redirect(url_for("reset_password"))
+        try:
+            with smtplib.SMTP("smtp.gmail.com", 587, timeout=10) as server:
+                server.starttls()
+                server.login(EMAIL, EMAIL_PASSWORD)
+                server.send_message(msg)
+        except (smtplib.SMTPException, OSError):
+            logger.exception("Failed to send password reset OTP to %s", email)
+            abort(502, description="Could not send the reset email. Try again later.")
 
-        return "Email not found"
+        session["reset_email"] = email
+        session["otp"] = str(otp)
+
+        return redirect(url_for("reset_password"))
 
     return render_template("forgot_password.html")
 
@@ -210,29 +308,33 @@ def reset_password():
 
     if request.method == "POST":
 
-        otp = request.form["otp"]
-        new_password = request.form["password"]
+        otp, new_password = required_fields("otp", "password")
 
-        if otp == session.get("otp"):
+        expected_otp = session.get("otp")
+        reset_email = session.get("reset_email")
 
-            hashed = generate_password_hash(new_password)
+        if not (expected_otp and reset_email):
+            flash("Your reset session expired. Please request a new OTP.", "danger")
 
-            cursor.execute(
+            return redirect(url_for("forgot_password"))
+
+        if otp != expected_otp:
+            flash("Invalid OTP.", "danger")
+
+            return render_template("reset_password.html"), 400
+
+        hashed = generate_password_hash(new_password)
+
+        with db_transaction() as cur:
+            cur.execute(
                 "UPDATE users SET password=%s WHERE email=%s",
-                (
-                    hashed,
-                    session["reset_email"]
-                )
+                (hashed, reset_email)
             )
 
-            db.commit()
+        session.pop("otp", None)
+        session.pop("reset_email", None)
 
-            session.pop("otp", None)
-            session.pop("reset_email", None)
-
-            return redirect(url_for("login"))
-
-        return "Invalid OTP"
+        return redirect(url_for("login"))
 
     return render_template("reset_password.html")
 @app.route("/product/<int:id>")
@@ -244,6 +346,9 @@ def product_details(id):
         (id,)
     )
     product = cursor.fetchone()
+
+    if product is None:
+        abort(404, description="Product not found")
 
     # Product Reviews
     cursor.execute("""
@@ -275,6 +380,11 @@ def add_to_cart(product_id):
 
     user_email = session["user"]
 
+    cursor.execute("SELECT id FROM products WHERE id=%s", (product_id,))
+
+    if cursor.fetchone() is None:
+        abort(404, description="Product not found")
+
     sql = """
     INSERT INTO cart(user_email, product_id, quantity)
     VALUES(%s, %s, %s)
@@ -282,8 +392,8 @@ def add_to_cart(product_id):
 
     values = (user_email, product_id, 1)
 
-    cursor.execute(sql, values)
-    db.commit()
+    with db_transaction() as cur:
+        cur.execute(sql, values)
 
     return redirect(url_for("cart"))
 # ---------------- Cart ----------------
@@ -323,8 +433,8 @@ def remove_cart(cart_id):
 
     sql = "DELETE FROM cart WHERE id=%s"
 
-    cursor.execute(sql, (cart_id,))
-    db.commit()
+    with db_transaction() as cur:
+        cur.execute(sql, (cart_id,))
 
     return redirect(url_for("cart"))
 # ---------------- Increase Quantity ----------------
@@ -333,8 +443,8 @@ def increase(cart_id):
 
     sql = "UPDATE cart SET quantity = quantity + 1 WHERE id=%s"
 
-    cursor.execute(sql, (cart_id,))
-    db.commit()
+    with db_transaction() as cur:
+        cur.execute(sql, (cart_id,))
 
     return redirect(url_for("cart"))
 # ---------------- Decrease Quantity ----------------
@@ -347,8 +457,8 @@ def decrease(cart_id):
     WHERE id=%s AND quantity > 1
     """
 
-    cursor.execute(sql, (cart_id,))
-    db.commit()
+    with db_transaction() as cur:
+        cur.execute(sql, (cart_id,))
 
     return redirect(url_for("cart"))
 
@@ -358,13 +468,21 @@ def payment():
     if "user" not in session:
         return redirect(url_for("login"))
 
+    if client is None:
+        logger.error("Payment requested but Razorpay credentials are not set")
+        abort(503, description="Payments are not configured")
+
     amount = 500 * 100   # ₹500 (Razorpay paise me amount leta hai)
 
-    order = client.order.create({
-        "amount": amount,
-        "currency": "INR",
-        "payment_capture": 1
-    })
+    try:
+        order = client.order.create({
+            "amount": amount,
+            "currency": "INR",
+            "payment_capture": 1
+        })
+    except Exception:
+        logger.exception("Razorpay order creation failed")
+        abort(502, description="Could not start the payment. Please try again.")
 
     return render_template(
         "payment.html",
@@ -380,6 +498,9 @@ def payment_success():
 
     payment_id = request.form.get("razorpay_payment_id")
 
+    if not payment_id:
+        abort(400, description="Missing Razorpay payment id")
+
     cursor.execute("""
         SELECT product_id, quantity
         FROM cart
@@ -388,37 +509,46 @@ def payment_success():
 
     cart_items = cursor.fetchall()
 
-    for item in cart_items:
+    # Orders and cart clearing must succeed or fail together.
+    with db_transaction() as cur:
 
-        product_id = item[0]
-        quantity = item[1]
+        for item in cart_items:
 
-        cursor.execute(
-            "SELECT price FROM products WHERE id=%s",
-            (product_id,)
+            product_id = item[0]
+            quantity = item[1]
+
+            cur.execute(
+                "SELECT price FROM products WHERE id=%s",
+                (product_id,)
+            )
+
+            row = cur.fetchone()
+
+            if row is None:
+                logger.error(
+                    "Cart references missing product %s for user %s",
+                    product_id,
+                    session["user"]
+                )
+                abort(409, description="A product in your cart no longer exists")
+
+            total = row[0] * quantity
+
+            cur.execute("""
+                INSERT INTO orders
+                (user_email, product_id, quantity, total_price)
+                VALUES(%s,%s,%s,%s)
+            """, (
+                session["user"],
+                product_id,
+                quantity,
+                total
+            ))
+
+        cur.execute(
+            "DELETE FROM cart WHERE user_email=%s",
+            (session["user"],)
         )
-
-        price = cursor.fetchone()[0]
-
-        total = price * quantity
-
-        cursor.execute("""
-            INSERT INTO orders
-            (user_email, product_id, quantity, total_price)
-            VALUES(%s,%s,%s,%s)
-        """, (
-            session["user"],
-            product_id,
-            quantity,
-            total
-        ))
-
-    cursor.execute(
-        "DELETE FROM cart WHERE user_email=%s",
-        (session["user"],)
-    )
-
-    db.commit()
 
     return render_template(
         "success.html",
@@ -456,25 +586,31 @@ def place_order():
     cursor.execute(sql, (user_email,))
     items = cursor.fetchall()
 
-    # Orders table me save karo
-    for item in items:
+    if not items:
+        flash("Your cart is empty.", "warning")
 
-        product_id = item[0]
-        quantity = item[1]
-        total_price = item[1] * item[2]
+        return redirect(url_for("cart"))
 
-        sql = """
-        INSERT INTO orders(user_email, product_id, quantity, total_price)
-        VALUES(%s,%s,%s,%s)
-        """
+    insert_sql = """
+    INSERT INTO orders(user_email, product_id, quantity, total_price)
+    VALUES(%s,%s,%s,%s)
+    """
 
-        cursor.execute(sql, (user_email, product_id, quantity, total_price))
+    # Orders and cart clearing must succeed or fail together.
+    with db_transaction() as cur:
 
-    db.commit()
+        for item in items:
 
-    # Cart Empty
-    cursor.execute("DELETE FROM cart WHERE user_email=%s", (user_email,))
-    db.commit()
+            product_id = item[0]
+            quantity = item[1]
+            total_price = item[1] * item[2]
+
+            cur.execute(
+                insert_sql,
+                (user_email, product_id, quantity, total_price)
+            )
+
+        cur.execute("DELETE FROM cart WHERE user_email=%s", (user_email,))
 
     return redirect(url_for("orders"))
 # ---------------- Orders ----------------
@@ -501,8 +637,6 @@ ORDER BY orders.id DESC
 
     cursor.execute(sql, (session["user"],))
 
-    cursor.execute(sql, (session["user"],))
-
     orders_data = cursor.fetchall()
 
     return render_template(
@@ -517,20 +651,22 @@ def review(product_id):
 
     if request.method == "POST":
 
-        rating = request.form["rating"]
-        review = request.form["review"]
+        rating, review = required_fields("rating", "review")
+        rating = parse_number(rating, "rating", int)
 
-        cursor.execute("""
-            INSERT INTO reviews(user_email, product_id, rating, review)
-            VALUES(%s,%s,%s,%s)
-        """, (
-            session["user"],
-            product_id,
-            rating,
-            review
-        ))
+        if not 1 <= rating <= 5:
+            abort(400, description="Rating must be between 1 and 5")
 
-        db.commit()
+        with db_transaction() as cur:
+            cur.execute("""
+                INSERT INTO reviews(user_email, product_id, rating, review)
+                VALUES(%s,%s,%s,%s)
+            """, (
+                session["user"],
+                product_id,
+                rating,
+                review
+            ))
 
         return redirect(url_for("orders"))
 
@@ -594,12 +730,14 @@ def admin_orders():
 @app.route("/ship-order/<int:order_id>")
 def ship_order(order_id):
 
-    cursor.execute(
-        "UPDATE orders SET order_status='Shipped' WHERE id=%s",
-        (order_id,)
-    )
+    with db_transaction() as cur:
+        cur.execute(
+            "UPDATE orders SET order_status='Shipped' WHERE id=%s",
+            (order_id,)
+        )
 
-    db.commit()
+        if cur.rowcount == 0:
+            abort(404, description="Order not found")
 
     return redirect(url_for("admin_orders"))
 
@@ -607,12 +745,14 @@ def ship_order(order_id):
 @app.route("/deliver-order/<int:order_id>")
 def deliver_order(order_id):
 
-    cursor.execute(
-        "UPDATE orders SET order_status='Delivered' WHERE id=%s",
-        (order_id,)
-    )
+    with db_transaction() as cur:
+        cur.execute(
+            "UPDATE orders SET order_status='Delivered' WHERE id=%s",
+            (order_id,)
+        )
 
-    db.commit()
+        if cur.rowcount == 0:
+            abort(404, description="Order not found")
 
     return redirect(url_for("admin_orders"))
 # ---------------- Edit Product ----------------
@@ -621,10 +761,12 @@ def edit_product(id):
 
     if request.method == "POST":
 
-        name = request.form["name"]
-        description = request.form["description"]
-        price = request.form["price"]
-        stock = request.form["stock"]
+        name, description, price, stock = required_fields(
+            "name", "description", "price", "stock"
+        )
+
+        price = parse_number(price, "price", float)
+        stock = parse_number(stock, "stock", int)
 
         sql = """
         UPDATE products
@@ -635,21 +777,30 @@ def edit_product(id):
         WHERE id=%s
         """
 
-        cursor.execute(sql, (name, description, price, stock, id))
-        db.commit()
+        with db_transaction() as cur:
+            cur.execute(sql, (name, description, price, stock, id))
+
+            if cur.rowcount == 0:
+                abort(404, description="Product not found")
 
         return redirect(url_for("products"))
 
     cursor.execute("SELECT * FROM products WHERE id=%s", (id,))
     product = cursor.fetchone()
 
+    if product is None:
+        abort(404, description="Product not found")
+
     return render_template("edit_product.html", product=product)
 # ---------------- Delete Product ----------------
 @app.route("/delete-product/<int:id>")
 def delete_product(id):
 
-    cursor.execute("DELETE FROM products WHERE id=%s", (id,))
-    db.commit()
+    with db_transaction() as cur:
+        cur.execute("DELETE FROM products WHERE id=%s", (id,))
+
+        if cur.rowcount == 0:
+            abort(404, description="Product not found")
 
     return redirect(url_for("products"))
 # ---------------- Wishlist ----------------
@@ -680,8 +831,8 @@ def wishlist():
 @app.route("/remove-wishlist/<int:id>")
 def remove_wishlist(id):
 
-    cursor.execute("DELETE FROM wishlist WHERE id=%s", (id,))
-    db.commit()
+    with db_transaction() as cur:
+        cur.execute("DELETE FROM wishlist WHERE id=%s", (id,))
 
     return redirect(url_for("wishlist"))
 # ---------------- Profile ----------------
@@ -698,6 +849,12 @@ def profile():
 
     user = cursor.fetchone()
 
+    if user is None:
+        logger.warning("Session user %s no longer exists", session["user"])
+        session.pop("user", None)
+
+        return redirect(url_for("login"))
+
     return render_template("profile.html", user=user)
 # ---------------- Edit Profile ----------------
 @app.route("/edit-profile", methods=["GET", "POST"])
@@ -708,8 +865,7 @@ def edit_profile():
 
     if request.method == "POST":
 
-        full_name = request.form["full_name"]
-        phone = request.form["phone"]
+        full_name, phone = required_fields("full_name", "phone")
 
         sql = """
         UPDATE users
@@ -718,8 +874,8 @@ def edit_profile():
         WHERE email=%s
         """
 
-        cursor.execute(sql, (full_name, phone, session["user"]))
-        db.commit()
+        with db_transaction() as cur:
+            cur.execute(sql, (full_name, phone, session["user"]))
 
         return redirect(url_for("profile"))
 
@@ -730,21 +886,20 @@ def edit_profile():
 
     user = cursor.fetchone()
 
-    return render_template("edit_profile.html", user=user)
+    if user is None:
+        logger.warning("Session user %s no longer exists", session["user"])
+        session.pop("user", None)
 
-    from flask import send_file
-from reportlab.pdfgen import canvas
+        return redirect(url_for("login"))
+
+    return render_template("edit_profile.html", user=user)
 
 
 @app.route("/invoice/<int:order_id>")
 def invoice(order_id):
 
-    filename = f"invoice_{order_id}.pdf"
-
-    c = canvas.Canvas(filename)
-
-    c.setFont("Helvetica-Bold", 18)
-    c.drawString(180, 800, "E-Commerce Invoice")
+    if "user" not in session:
+        return redirect(url_for("login"))
 
     cursor.execute("""
         SELECT
@@ -755,19 +910,33 @@ def invoice(order_id):
         FROM orders
         JOIN products
         ON orders.product_id = products.id
-        WHERE orders.id=%s
-    """, (order_id,))
+        WHERE orders.id=%s AND orders.user_email=%s
+    """, (order_id, session["user"]))
 
     order = cursor.fetchone()
 
-    c.setFont("Helvetica", 14)
+    if order is None:
+        abort(404, description="Order not found")
 
-    c.drawString(50, 730, f"Product : {order[0]}")
-    c.drawString(50, 700, f"Quantity : {order[1]}")
-    c.drawString(50, 670, f"Total : ₹{order[2]}")
-    c.drawString(50, 640, f"Date : {order[3]}")
+    filename = f"invoice_{order_id}.pdf"
 
-    c.save()
+    try:
+        c = canvas.Canvas(filename)
+
+        c.setFont("Helvetica-Bold", 18)
+        c.drawString(180, 800, "E-Commerce Invoice")
+
+        c.setFont("Helvetica", 14)
+
+        c.drawString(50, 730, f"Product : {order[0]}")
+        c.drawString(50, 700, f"Quantity : {order[1]}")
+        c.drawString(50, 670, f"Total : ₹{order[2]}")
+        c.drawString(50, 640, f"Date : {order[3]}")
+
+        c.save()
+    except OSError:
+        logger.exception("Failed to generate invoice for order %s", order_id)
+        abort(500, description="Could not generate the invoice")
 
     return send_file(filename, as_attachment=True)
 
