@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 300" role="img" aria-label="Backpack">
+  <defs>
+    <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#64748b"/>
+      <stop offset="100%" stop-color="#0f172a"/>
+    </linearGradient>
+  </defs>
+  <rect width="400" height="300" fill="url(#g)"/>
+  <circle cx="330" cy="60" r="70" fill="#ffffff" opacity="0.12"/>
+  <circle cx="70" cy="250" r="90" fill="#ffffff" opacity="0.10"/>
+  <text x="200" y="160" text-anchor="middle" font-family="Segoe UI, Helvetica, Arial, sans-serif"
+        font-size="30" font-weight="700" fill="#ffffff">Backpack</text>
+  <text x="200" y="192" text-anchor="middle" font-family="Segoe UI, Helvetica, Arial, sans-serif"
+        font-size="15" fill="#ffffff" opacity="0.85">ShopKart</text>
+</svg>

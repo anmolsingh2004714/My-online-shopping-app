@@ -1,0 +1,66 @@
+{% extends "base.html" %}
+{% block title %}Shop — ShopKart{% endblock %}
+
+{% block content %}
+<div class="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+  <div>
+    <h1 class="text-2xl font-bold sm:text-3xl">Shop</h1>
+    <p class="mt-1 text-sm text-slate-500">
+      {{ products|length }} product{{ '' if products|length == 1 else 's' }}
+      {% if search %}for “{{ search }}”{% endif %}
+    </p>
+  </div>
+
+  <form method="get" class="flex flex-wrap items-center gap-2">
+    <input type="hidden" name="search" value="{{ search }}">
+    <input type="hidden" name="category" value="{{ active_category }}">
+    <label class="sr-only" for="sort">Sort products</label>
+    <select id="sort" name="sort" onchange="this.form.submit()"
+            class="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm focus:border-brand-500 focus:outline-none">
+      {% for value, label in [
+          ('featured', 'Top rated'),
+          ('price-asc', 'Price: low to high'),
+          ('price-desc', 'Price: high to low'),
+          ('name', 'Name A–Z')
+      ] %}
+        <option value="{{ value }}" {% if sort == value %}selected{% endif %}>{{ label }}</option>
+      {% endfor %}
+    </select>
+  </form>
+</div>
+
+<div class="mt-6 grid gap-8 lg:grid-cols-[16rem_1fr]">
+  <aside class="lg:sticky lg:top-24 lg:self-start">
+    <p class="text-sm font-semibold">Categories</p>
+    <div class="mt-3 flex flex-wrap gap-2 lg:flex-col">
+      {% for category in categories %}
+        <a href="{{ url_for('products', category=category, search=search, sort=sort) }}"
+           class="rounded-lg border px-3 py-2 text-sm
+                  {% if category == active_category %}border-brand-500 bg-brand-50 font-semibold text-brand-700
+                  {% else %}border-slate-200 bg-white hover:border-brand-300{% endif %}">
+          {{ category }}
+        </a>
+      {% endfor %}
+    </div>
+  </aside>
+
+  <section>
+    {% if products %}
+      <div class="grid gap-5 sm:grid-cols-2 xl:grid-cols-3">
+        {% for product in products %}
+          {% include "_product_card.html" %}
+        {% endfor %}
+      </div>
+    {% else %}
+      <div class="rounded-2xl border border-dashed border-slate-300 bg-white p-10 text-center">
+        <p class="text-base font-semibold">No products matched your filters</p>
+        <p class="mt-1 text-sm text-slate-500">Try a different search term or clear the category filter.</p>
+        <a href="{{ url_for('products') }}"
+           class="mt-4 inline-block rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-white hover:bg-brand-700">
+          Reset filters
+        </a>
+      </div>
+    {% endif %}
+  </section>
+</div>
+{% endblock %}

@@ -1,0 +1,66 @@
+{% extends "base.html" %}
+{% block title %}Checkout — ShopKart{% endblock %}
+
+{% block content %}
+<h1 class="text-2xl font-bold sm:text-3xl">Checkout</h1>
+
+<div class="mt-6 grid gap-6 lg:grid-cols-[1fr_20rem]">
+  <form method="post" class="space-y-5 rounded-2xl border border-slate-200 bg-white p-5 sm:p-6">
+    <div class="grid gap-4 sm:grid-cols-2">
+      <div>
+        <label for="name" class="text-sm font-medium">Full name</label>
+        <input id="name" name="name" value="{{ user['full_name'] }}"
+               class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm focus:border-brand-500 focus:outline-none">
+      </div>
+      <div>
+        <label for="phone" class="text-sm font-medium">Phone</label>
+        <input id="phone" name="phone" value="{{ user['phone'] or '' }}"
+               class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm focus:border-brand-500 focus:outline-none">
+      </div>
+    </div>
+
+    <div>
+      <label for="address" class="text-sm font-medium">Delivery address</label>
+      <textarea id="address" name="address" rows="4" required placeholder="Flat, street, city, PIN code"
+                class="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2.5 text-sm focus:border-brand-500 focus:outline-none"></textarea>
+    </div>
+
+    <fieldset class="grid gap-3 sm:grid-cols-2">
+      <legend class="text-sm font-medium">Payment method</legend>
+      <label class="flex cursor-pointer items-center gap-3 rounded-xl border border-slate-300 p-3 text-sm has-[:checked]:border-brand-500 has-[:checked]:bg-brand-50">
+        <input type="radio" name="payment" value="cod" checked class="accent-brand-600">
+        Cash on delivery
+      </label>
+      <label class="flex cursor-pointer items-center gap-3 rounded-xl border border-slate-300 p-3 text-sm has-[:checked]:border-brand-500 has-[:checked]:bg-brand-50">
+        <input type="radio" name="payment" value="upi" class="accent-brand-600">
+        UPI (demo only)
+      </label>
+    </fieldset>
+
+    <button type="submit"
+            class="w-full rounded-lg bg-brand-600 px-4 py-3 text-sm font-semibold text-white hover:bg-brand-700">
+      Place order · {{ summary['total']|rupees }}
+    </button>
+  </form>
+
+  <aside class="h-fit rounded-2xl border border-slate-200 bg-white p-5">
+    <h2 class="text-base font-bold">{{ summary['count'] }} item{{ '' if summary['count'] == 1 else 's' }}</h2>
+    <ul class="mt-4 space-y-3 text-sm">
+      {% for item in items %}
+        <li class="flex justify-between gap-3">
+          <span class="text-slate-600">{{ item['name'] }} × {{ item['quantity'] }}</span>
+          <span class="font-medium">{{ (item['price'] * item['quantity'])|rupees }}</span>
+        </li>
+      {% endfor %}
+    </ul>
+    <dl class="mt-4 space-y-2 border-t border-slate-200 pt-4 text-sm">
+      <div class="flex justify-between"><dt class="text-slate-500">Subtotal</dt><dd>{{ summary['subtotal']|rupees }}</dd></div>
+      <div class="flex justify-between">
+        <dt class="text-slate-500">Shipping</dt>
+        <dd>{% if summary['shipping'] %}{{ summary['shipping']|rupees }}{% else %}Free{% endif %}</dd>
+      </div>
+      <div class="flex justify-between text-base font-bold"><dt>Total</dt><dd>{{ summary['total']|rupees }}</dd></div>
+    </dl>
+  </aside>
+</div>
+{% endblock %}

@@ -1,0 +1,66 @@
+{% extends "base.html" %}
+{% block title %}{{ product['name'] }} — ShopKart{% endblock %}
+
+{% block content %}
+<nav class="text-sm text-slate-500">
+  <a href="{{ url_for('home') }}" class="hover:text-brand-600">Home</a>
+  <span class="px-1">/</span>
+  <a href="{{ url_for('products', category=product['category']) }}" class="hover:text-brand-600">{{ product['category'] }}</a>
+  <span class="px-1">/</span>
+  <span class="text-slate-700">{{ product['name'] }}</span>
+</nav>
+
+<div class="mt-6 grid gap-8 lg:grid-cols-2">
+  <div class="overflow-hidden rounded-3xl border border-slate-200 bg-white">
+    <img src="{{ url_for('static', filename='img/' ~ product['image'] ~ '.svg') }}" alt="{{ product['name'] }}"
+         class="aspect-[4/3] w-full object-cover">
+  </div>
+
+  <div>
+    <p class="text-xs font-semibold uppercase tracking-wide text-brand-600">{{ product['category'] }}</p>
+    <h1 class="mt-2 text-2xl font-bold sm:text-3xl">{{ product['name'] }}</h1>
+    <p class="mt-2 text-sm text-slate-500">★ {{ product['rating'] }} · {{ product['stock'] }} in stock</p>
+
+    <p class="mt-4 text-3xl font-extrabold">{{ product['price']|rupees }}</p>
+    <p class="mt-4 text-sm leading-relaxed text-slate-600">{{ product['description'] }}</p>
+
+    <form action="{{ url_for('add_to_cart', product_id=product['id']) }}" method="post"
+          class="mt-6 flex flex-wrap items-center gap-3">
+      <label class="sr-only" for="quantity">Quantity</label>
+      <input id="quantity" name="quantity" type="number" min="1" max="{{ product['stock'] }}" value="1"
+             class="w-24 rounded-lg border border-slate-300 px-3 py-2.5 text-sm focus:border-brand-500 focus:outline-none">
+      <button type="submit"
+              class="flex-1 rounded-lg bg-brand-600 px-5 py-3 text-sm font-semibold text-white hover:bg-brand-700 sm:flex-none">
+        Add to cart
+      </button>
+      <a href="{{ url_for('cart') }}"
+         class="rounded-lg border border-slate-300 px-5 py-3 text-sm font-semibold hover:bg-slate-100">Go to cart</a>
+    </form>
+
+    <dl class="mt-8 grid gap-3 sm:grid-cols-2">
+      {% for label, value in [
+          ('Delivery', 'Free above ₹2,000'),
+          ('Returns', '7 day replacement'),
+          ('Warranty', '1 year brand warranty'),
+          ('Payment', 'Cash on delivery available')
+      ] %}
+        <div class="rounded-xl border border-slate-200 bg-white p-3">
+          <dt class="text-xs uppercase tracking-wide text-slate-400">{{ label }}</dt>
+          <dd class="text-sm font-medium">{{ value }}</dd>
+        </div>
+      {% endfor %}
+    </dl>
+  </div>
+</div>
+
+{% if related %}
+  <section class="mt-14">
+    <h2 class="text-xl font-bold">More in {{ product['category'] }}</h2>
+    <div class="mt-5 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+      {% for product in related %}
+        {% include "_product_card.html" %}
+      {% endfor %}
+    </div>
+  </section>
+{% endif %}
+{% endblock %}

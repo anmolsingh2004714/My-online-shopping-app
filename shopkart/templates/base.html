@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}ShopKart{% endblock %}</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              50: '#eef2ff', 100: '#e0e7ff', 500: '#6366f1',
+              600: '#4f46e5', 700: '#4338ca'
+            }
+          }
+        }
+      }
+    }
+  </script>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body class="min-h-full flex flex-col bg-slate-50 text-slate-800 antialiased">
+
+  <header class="sticky top-0 z-40 bg-white/90 backdrop-blur border-b border-slate-200">
+    <nav class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+      <div class="flex h-16 items-center justify-between gap-4">
+        <a href="{{ url_for('home') }}" class="flex items-center gap-2 text-lg font-bold text-brand-600">
+          <span class="grid h-9 w-9 place-items-center rounded-xl bg-brand-600 text-white">S</span>
+          <span class="hidden sm:inline">ShopKart</span>
+        </a>
+
+        <form action="{{ url_for('products') }}" method="get" class="hidden flex-1 md:block md:max-w-md">
+          <label class="sr-only" for="desktop-search">Search products</label>
+          <input id="desktop-search" name="search" value="{{ search or '' }}" type="search"
+                 placeholder="Search headphones, keyboards, watches…"
+                 class="w-full rounded-full border border-slate-300 bg-slate-50 px-4 py-2 text-sm
+                        focus:border-brand-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand-100">
+        </form>
+
+        <div class="flex items-center gap-1 sm:gap-2">
+          <a href="{{ url_for('products') }}"
+             class="hidden rounded-lg px-3 py-2 text-sm font-medium hover:bg-slate-100 sm:block">Shop</a>
+          {% if user %}
+            <a href="{{ url_for('orders') }}"
+               class="hidden rounded-lg px-3 py-2 text-sm font-medium hover:bg-slate-100 sm:block">Orders</a>
+          {% endif %}
+
+          <a href="{{ url_for('cart') }}" class="relative rounded-lg px-3 py-2 text-sm font-medium hover:bg-slate-100">
+            Cart
+            {% if cart_count %}
+              <span class="absolute -right-1 -top-1 grid h-5 w-5 place-items-center rounded-full
+                           bg-brand-600 text-[11px] font-bold text-white">{{ cart_count }}</span>
+            {% endif %}
+          </a>
+
+          {% if user %}
+            <a href="{{ url_for('logout') }}"
+               class="rounded-lg border border-slate-300 px-3 py-2 text-sm font-medium hover:bg-slate-100">Sign out</a>
+          {% else %}
+            <a href="{{ url_for('login') }}"
+               class="rounded-lg bg-brand-600 px-3 py-2 text-sm font-semibold text-white hover:bg-brand-700">Sign in</a>
+          {% endif %}
+
+          <button type="button" data-menu-toggle
+                  class="rounded-lg p-2 hover:bg-slate-100 md:hidden" aria-label="Toggle menu">
+            <span class="block h-0.5 w-5 bg-slate-700"></span>
+            <span class="mt-1 block h-0.5 w-5 bg-slate-700"></span>
+            <span class="mt-1 block h-0.5 w-5 bg-slate-700"></span>
+          </button>
+        </div>
+      </div>
+
+      <div data-menu class="hidden pb-4 md:hidden">
+        <form action="{{ url_for('products') }}" method="get" class="mb-3">
+          <label class="sr-only" for="mobile-search">Search products</label>
+          <input id="mobile-search" name="search" value="{{ search or '' }}" type="search"
+                 placeholder="Search products…"
+                 class="w-full rounded-full border border-slate-300 px-4 py-2 text-sm
+                        focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-100">
+        </form>
+        <div class="grid gap-1 text-sm font-medium">
+          <a href="{{ url_for('home') }}" class="rounded-lg px-3 py-2 hover:bg-slate-100">Home</a>
+          <a href="{{ url_for('products') }}" class="rounded-lg px-3 py-2 hover:bg-slate-100">Shop</a>
+          {% if user %}
+            <a href="{{ url_for('orders') }}" class="rounded-lg px-3 py-2 hover:bg-slate-100">My orders</a>
+          {% else %}
+            <a href="{{ url_for('register') }}" class="rounded-lg px-3 py-2 hover:bg-slate-100">Create account</a>
+          {% endif %}
+        </div>
+      </div>
+    </nav>
+  </header>
+
+  {% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+      <div class="mx-auto mt-4 w-full max-w-7xl space-y-2 px-4 sm:px-6 lg:px-8">
+        {% for category, message in messages %}
+          <p class="rounded-xl border px-4 py-3 text-sm
+                    {% if category == 'error' %}border-rose-200 bg-rose-50 text-rose-700
+                    {% else %}border-emerald-200 bg-emerald-50 text-emerald-700{% endif %}">
+            {{ message }}
+          </p>
+        {% endfor %}
+      </div>
+    {% endif %}
+  {% endwith %}
+
+  <main class="mx-auto w-full max-w-7xl flex-1 px-4 py-8 sm:px-6 lg:px-8">
+    {% block content %}{% endblock %}
+  </main>
+
+  <footer class="border-t border-slate-200 bg-white">
+    <div class="mx-auto grid max-w-7xl gap-6 px-4 py-10 sm:px-6 sm:grid-cols-2 lg:grid-cols-4 lg:px-8">
+      <div>
+        <p class="text-base font-bold text-brand-600">ShopKart</p>
+        <p class="mt-2 text-sm text-slate-500">A responsive Flask + Tailwind demo storefront.</p>
+      </div>
+      <div>
+        <p class="text-sm font-semibold">Shop</p>
+        <ul class="mt-2 space-y-1 text-sm text-slate-500">
+          <li><a class="hover:text-brand-600" href="{{ url_for('products') }}">All products</a></li>
+          <li><a class="hover:text-brand-600" href="{{ url_for('products', category='Audio') }}">Audio</a></li>
+          <li><a class="hover:text-brand-600" href="{{ url_for('products', category='Accessories') }}">Accessories</a></li>
+        </ul>
+      </div>
+      <div>
+        <p class="text-sm font-semibold">Account</p>
+        <ul class="mt-2 space-y-1 text-sm text-slate-500">
+          <li><a class="hover:text-brand-600" href="{{ url_for('login') }}">Sign in</a></li>
+          <li><a class="hover:text-brand-600" href="{{ url_for('register') }}">Create account</a></li>
+          <li><a class="hover:text-brand-600" href="{{ url_for('cart') }}">Cart</a></li>
+        </ul>
+      </div>
+      <div>
+        <p class="text-sm font-semibold">Demo login</p>
+        <p class="mt-2 text-sm text-slate-500">demo@shopkart.test<br>demo1234</p>
+      </div>
+    </div>
+  </footer>
+
+  <script>
+    document.querySelector('[data-menu-toggle]')?.addEventListener('click', () => {
+      document.querySelector('[data-menu]')?.classList.toggle('hidden');
+    });
+  </script>
+</body>
+</html>

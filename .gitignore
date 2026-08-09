@@ -1,4 +1,6 @@
 venv/
+instance/
+*.sqlite3
 .env
 __pycache__/
 transfer_db.py

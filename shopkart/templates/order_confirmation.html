@@ -1,0 +1,34 @@
+{% extends "base.html" %}
+{% block title %}Order #{{ order['id'] }} — ShopKart{% endblock %}
+
+{% block content %}
+<div class="mx-auto max-w-2xl">
+  <div class="rounded-3xl border border-emerald-200 bg-emerald-50 p-6 text-center sm:p-8">
+    <p class="text-xs font-semibold uppercase tracking-widest text-emerald-700">Order confirmed</p>
+    <h1 class="mt-2 text-2xl font-bold text-emerald-900 sm:text-3xl">Thanks for shopping with us!</h1>
+    <p class="mt-2 text-sm text-emerald-800">Order #{{ order['id'] }} · {{ order['total']|rupees }}</p>
+  </div>
+
+  <div class="mt-6 rounded-2xl border border-slate-200 bg-white p-5 sm:p-6">
+    <h2 class="text-base font-bold">Items</h2>
+    <ul class="mt-4 space-y-3 text-sm">
+      {% for item in items %}
+        <li class="flex justify-between gap-3">
+          <span class="text-slate-600">{{ item['name'] }} × {{ item['quantity'] }}</span>
+          <span class="font-medium">{{ (item['price'] * item['quantity'])|rupees }}</span>
+        </li>
+      {% endfor %}
+    </ul>
+
+    <h2 class="mt-6 text-base font-bold">Delivering to</h2>
+    <p class="mt-2 whitespace-pre-line text-sm text-slate-600">{{ order['address'] }}</p>
+
+    <div class="mt-6 flex flex-wrap gap-3">
+      <a href="{{ url_for('orders') }}"
+         class="rounded-lg bg-brand-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-brand-700">All orders</a>
+      <a href="{{ url_for('products') }}"
+         class="rounded-lg border border-slate-300 px-4 py-2.5 text-sm font-semibold hover:bg-slate-100">Keep shopping</a>
+    </div>
+  </div>
+</div>
+{% endblock %}
