@@ -72,6 +72,18 @@ def test_quantity_can_be_increased_and_never_drops_below_one(auth_client):
     assert "₹1,499" in auth_client.get("/cart").get_data(as_text=True)
 
 
+def test_quantity_cannot_exceed_stock(auth_client):
+    """Product 4 (Kraft Mechanical Keyboard) has 11 units in stock."""
+
+    auth_client.post("/cart/add/4", data={"quantity": 11})
+
+    auth_client.post("/cart/update/1", data={"delta": 1})
+
+    body = auth_client.get("/cart").get_data(as_text=True)
+    assert ">11<" in body
+    assert "₹60,489" in body  # 5499 x 11
+
+
 def test_remove_from_cart_empties_it(auth_client):
     auth_client.post("/cart/add/2", data={"quantity": 1})
 

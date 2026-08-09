@@ -288,7 +288,13 @@ def register_routes(app):
         db.execute(
             """
             UPDATE cart_items
-            SET quantity = MAX(1, quantity + ?)
+            SET quantity = MAX(
+                1,
+                MIN(
+                    quantity + ?,
+                    (SELECT stock FROM products WHERE id = cart_items.product_id)
+                )
+            )
             WHERE id = ? AND user_id = ?
             """,
             (delta, item_id, session["user_id"]),
