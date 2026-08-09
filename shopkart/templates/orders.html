@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+{% block title %}My orders — ShopKart{% endblock %}
+
+{% block content %}
+<h1 class="text-2xl font-bold sm:text-3xl">My orders</h1>
+
+{% if orders %}
+  <ul class="mt-6 space-y-4">
+    {% for order in orders %}
+      <li class="flex flex-col gap-3 rounded-2xl border border-slate-200 bg-white p-5 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <p class="text-sm font-semibold">Order #{{ order['id'] }}</p>
+          <p class="mt-1 text-sm text-slate-500">
+            {{ order['lines'] }} item{{ '' if order['lines'] == 1 else 's' }} · placed {{ order['placed_at'] }}
+          </p>
+          <p class="mt-1 text-sm text-slate-500">{{ order['address'] }}</p>
+        </div>
+        <div class="flex items-center gap-4">
+          <span class="text-lg font-bold">{{ order['total']|rupees }}</span>
+          <a href="{{ url_for('order_confirmation', order_id=order['id']) }}"
+             class="rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold hover:bg-slate-100">Details</a>
+        </div>
+      </li>
+    {% endfor %}
+  </ul>
+{% else %}
+  <div class="mt-6 rounded-2xl border border-dashed border-slate-300 bg-white p-10 text-center">
+    <p class="text-base font-semibold">No orders yet</p>
+    <a href="{{ url_for('products') }}"
+       class="mt-4 inline-block rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-white hover:bg-brand-700">
+      Browse products
+    </a>
+  </div>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,84 @@
+{% extends "base.html" %}
+{% block title %}Your cart — ShopKart{% endblock %}
+
+{% block content %}
+<h1 class="text-2xl font-bold sm:text-3xl">Your cart</h1>
+
+{% if items %}
+  <div class="mt-6 grid gap-6 lg:grid-cols-[1fr_20rem]">
+    <ul class="space-y-4">
+      {% for item in items %}
+        <li class="flex flex-col gap-4 rounded-2xl border border-slate-200 bg-white p-4 sm:flex-row sm:items-center">
+          <img src="{{ url_for('static', filename='img/' ~ item['image']) }}" alt="{{ item['name'] }}"
+               class="h-24 w-full rounded-xl object-cover sm:h-20 sm:w-24">
+
+          <div class="flex-1">
+            <a href="{{ url_for('product_details', product_id=item['product_id']) }}"
+               class="text-sm font-semibold hover:text-brand-600 sm:text-base">{{ item['name'] }}</a>
+            <p class="mt-1 text-sm text-slate-500">{{ item['price']|rupees }} each</p>
+          </div>
+
+          <div class="flex items-center gap-2">
+            <form action="{{ url_for('update_cart', item_id=item['id']) }}" method="post">
+              <input type="hidden" name="delta" value="-1">
+              <button class="h-9 w-9 rounded-lg border border-slate-300 text-lg leading-none hover:bg-slate-100"
+                      aria-label="Decrease quantity">−</button>
+            </form>
+            <span class="w-8 text-center text-sm font-semibold">{{ item['quantity'] }}</span>
+            <form action="{{ url_for('update_cart', item_id=item['id']) }}" method="post">
+              <input type="hidden" name="delta" value="1">
+              <button class="h-9 w-9 rounded-lg border border-slate-300 text-lg leading-none hover:bg-slate-100"
+                      aria-label="Increase quantity">+</button>
+            </form>
+          </div>
+
+          <div class="flex items-center justify-between gap-4 sm:flex-col sm:items-end">
+            <span class="text-base font-bold">{{ (item['price'] * item['quantity'])|rupees }}</span>
+            <form action="{{ url_for('remove_from_cart', item_id=item['id']) }}" method="post">
+              <button class="text-xs font-semibold text-rose-600 hover:underline">Remove</button>
+            </form>
+          </div>
+        </li>
+      {% endfor %}
+    </ul>
+
+    <aside class="h-fit rounded-2xl border border-slate-200 bg-white p-5 lg:sticky lg:top-24">
+      <h2 class="text-base font-bold">Order summary</h2>
+      <dl class="mt-4 space-y-2 text-sm">
+        <div class="flex justify-between"><dt class="text-slate-500">Subtotal</dt><dd>{{ summary['subtotal']|rupees }}</dd></div>
+        <div class="flex justify-between">
+          <dt class="text-slate-500">Shipping</dt>
+          <dd>{% if summary['shipping'] %}{{ summary['shipping']|rupees }}{% else %}Free{% endif %}</dd>
+        </div>
+        <div class="flex justify-between border-t border-slate-200 pt-3 text-base font-bold">
+          <dt>Total</dt><dd>{{ summary['total']|rupees }}</dd>
+        </div>
+      </dl>
+
+      {% if summary['shipping'] %}
+        <p class="mt-3 rounded-lg bg-brand-50 px-3 py-2 text-xs text-brand-700">
+          Add {{ (2000 - summary['subtotal'])|rupees }} more for free shipping.
+        </p>
+      {% endif %}
+
+      <a href="{{ url_for('checkout') }}"
+         class="mt-5 block rounded-lg bg-brand-600 px-4 py-3 text-center text-sm font-semibold text-white hover:bg-brand-700">
+        Proceed to checkout
+      </a>
+      <a href="{{ url_for('products') }}"
+         class="mt-2 block rounded-lg border border-slate-300 px-4 py-3 text-center text-sm font-semibold hover:bg-slate-100">
+        Continue shopping
+      </a>
+    </aside>
+  </div>
+{% else %}
+  <div class="mt-6 rounded-2xl border border-dashed border-slate-300 bg-white p-10 text-center">
+    <p class="text-base font-semibold">Your cart is empty</p>
+    <p class="mt-1 text-sm text-slate-500">Browse the catalogue and add something you like.</p>
+    <a href="{{ url_for('products') }}"
+       class="mt-4 inline-block rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-white hover:bg-brand-700">
+      Start shopping
+    </a>
+  </div>
+{% endif %}
+{% endblock %}

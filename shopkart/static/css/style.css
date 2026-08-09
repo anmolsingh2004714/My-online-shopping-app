@@ -1,0 +1,125 @@
+/* Small additions on top of Tailwind's utility classes. */
+
+html {
+  scroll-behavior: smooth;
+}
+
+:focus-visible {
+  outline: 2px solid #4f46e5;
+  outline-offset: 2px;
+}
+
+/* Hide the number input spinners so the quantity field matches the buttons. */
+input[type="number"] {
+  -moz-appearance: textfield;
+}
+
+input[type="number"]::-webkit-outer-spin-button,
+input[type="number"]::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+/* Cards drift up as the grid paints; each column is offset slightly. */
+@keyframes rise-in {
+  from {
+    opacity: 0;
+    transform: translateY(18px);
+  }
+}
+
+.reveal {
+  animation: rise-in 0.55s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.reveal:nth-child(3n + 2) {
+  animation-delay: 0.08s;
+}
+
+.reveal:nth-child(3n) {
+  animation-delay: 0.16s;
+}
+
+/* Photo frame: slow zoom plus a diagonal highlight sweeping across on hover. */
+.media-zoom img {
+  transition: transform 0.7s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.group:hover .media-zoom img,
+.media-zoom:hover img {
+  transform: scale(1.08);
+}
+
+.media-zoom::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    115deg,
+    transparent 35%,
+    rgb(255 255 255 / 45%) 50%,
+    transparent 65%
+  );
+  transform: translateX(-120%);
+  pointer-events: none;
+}
+
+.group:hover .media-zoom::after,
+.media-zoom:hover::after {
+  animation: sheen 0.9s ease-out;
+}
+
+@keyframes sheen {
+  to {
+    transform: translateX(120%);
+  }
+}
+
+/* Hero keeps its gradient slowly drifting. */
+@keyframes drift {
+  50% {
+    background-position: 100% 50%;
+  }
+}
+
+.gradient-drift {
+  background-size: 200% 200%;
+  animation: drift 14s ease-in-out infinite;
+}
+
+/* Floating blobs behind the hero copy. */
+@keyframes float-blob {
+  50% {
+    transform: translate3d(0, -18px, 0) scale(1.06);
+  }
+}
+
+.blob {
+  animation: float-blob 9s ease-in-out infinite;
+}
+
+.blob-slow {
+  animation-duration: 13s;
+  animation-delay: -3s;
+}
+
+.press:active {
+  transform: scale(0.96);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+
+  .reveal,
+  .gradient-drift,
+  .blob,
+  .media-zoom::after {
+    animation: none;
+  }
+
+  .media-zoom img {
+    transition: none;
+  }
+}
